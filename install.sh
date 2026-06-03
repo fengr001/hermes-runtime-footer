@@ -5,7 +5,7 @@ set -euo pipefail
 #  hermes-runtime-footer — 一键安装脚本
 #
 #  用法：
-#    bash <(curl -fsSL https://raw.githubusercontent.com/fengr001/hermes-runtime-footer/main/install.sh)
+#    bash <(curl -fsSL https://raw.githubusercontent.com/<你的用户名>/hermes-runtime-footer/main/install.sh)
 #
 #  或本地：
 #    bash install.sh
@@ -45,10 +45,10 @@ ok "脚本已安装: $SCRIPT_DIR/session_stats.py"
 
 # ── 3. 测试脚本能否运行 ──
 if python3 "$SCRIPT_DIR/session_stats.py" > /dev/null 2>&1; then
-    OUTPUT=$(python3 "$SCRIPT_DIR/session_stats.py" 2>/dev/null || echo "(no data)")
+    OUTPUT=$(python3 "$SCRIPT_DIR/session_stats.py" 2>/dev/null || echo "(无数据)")
     ok "脚本测试通过 → $OUTPUT"
 else
-    warn "脚本可执行但部分字段无数据（正常，看板/GPU 可选）"
+    warn "脚本可执行，但部分字段无数据（正常，看板/GPU 为可选字段）"
 fi
 
 # ── 4. 打 gateway 补丁 ──
@@ -68,32 +68,31 @@ if [ -d "$HERMES_AGENT_DIR/.git" ]; then
                 warn "补丁无法直接应用（版本可能不同），请手动修改："
                 warn "  $HERMES_AGENT_DIR/gateway/runtime_footer.py"
                 warn "  $HERMES_AGENT_DIR/gateway/run.py"
-                warn "参考: https://github.com/fengr001/hermes-runtime-footer"
+                warn "参考项目 README 获取手动修改说明"
             fi
             cd - > /dev/null
         fi
     else
         warn "补丁文件未找到 ($PATCH_FILE)，跳过 gateway 修改"
-        warn "仅使用回退模式（⏰ 可能不精确但 📋🎮🤖 正常）"
+        warn "将使用回退模式（⏰ 可能不精确，但 📋🎮🤖 正常）"
     fi
 else
-    warn "hermes-agent 不是 git 仓库，跳过自动补丁"
-    warn "请手动修改 gateway 代码（见 README.md）"
+    warn "hermes-agent 不是 git 仓库，跳过自动打补丁"
+    warn "请手动修改 gateway 代码（参考 README）"
 fi
 
 # ── 5. 修改 config.yaml ──
 CONFIG_FILE="$HERMES_HOME/config.yaml"
 if [ -f "$CONFIG_FILE" ]; then
     # 检测是否已启用
-    if grep -q "runtime_footer:" "$CONFIG_FILE" && grep -A2 "runtime_footer:" "$CONFIG_FILE" | grep "enabled: true" > /dev/null; then
+    if grep -q "runtime_footer:" "$CONFIG_FILE" && \
+       grep -A2 "runtime_footer:" "$CONFIG_FILE" | grep "enabled: true" > /dev/null; then
         ok "runtime_footer 已在 config.yaml 中启用"
     else
         # 在 display: 段下追加（若无则创建）
         if grep -q "^display:" "$CONFIG_FILE"; then
-            # 已有 display 段，追加到段内
             sed -i '/^display:/a\  runtime_footer:\n    enabled: true' "$CONFIG_FILE"
         else
-            # 无 display 段，追加到文件末尾
             cat >> "$CONFIG_FILE" << 'EOF'
 
 display:
@@ -131,4 +130,4 @@ echo -e "  下一条回复末尾将显示类似："
 echo -e "  ${CYAN}⏰10:30 | 📋空闲 | 🎮42% | 🤖CS4${NC}"
 echo ""
 echo -e "  如需移除，运行:  ${YELLOW}rm -f $SCRIPT_DIR/session_stats.py${NC}"
-echo -e "  在 config.yaml 中把 enabled 改回 false"
+echo -e "  并在 config.yaml 中把 enabled 改回 false"
