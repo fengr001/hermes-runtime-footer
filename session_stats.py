@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-hermes-runtime-footer — 消息小尾巴
+hermes-runtime-footer — Hermes Agent 消息小尾巴
 
 每条回复末尾自动输出一行紧凑状态，显示：
   ⏰会话开始时间 · 📋看板活跃任务 · 🎮GPU占用 · 🤖当前模型
 
-设计原则：
-  - 零外部依赖（只用 Python stdlib）
+特点：
+  - 零外部依赖（只用 Python 标准库）
   - 每个字段独立 try/except，一个挂了不影响其他
   - 看板无活跃时显示「空闲」而非空行
 
 用法：
-  # 无参：从 sessions.json 索引读最新 feishu 会话时间
+  # 无参：从 sessions.json 索引读取最新 feishu 会话时间
   python3 session_stats.py
 
   # 传参：gateway 传入当前会话精确开始时间
-  python3 session_stats.py --start 2026-06-03T06:36:14.508713
+  python3 session_stats.py --start 2026-06-03T10:30:00.000000
 """
 import subprocess, json, os, re
 from datetime import datetime
@@ -59,11 +59,10 @@ def get_kanban_stats():
     )
     boards = re.findall(r'^(?:[│●]| {4})\s*([a-z][a-z0-9_-]+)\s{2,}', r.stdout, re.M)
     if not boards:
-        boards = ['investment', 'ai-center', 'erp-dev']
+        boards = ['default']
 
     NAME_SHORT = {
-        'investment': '投资', 'ai-center': 'AI中',
-        'erp-dev': 'ERP', 'default': '默认',
+        'default': '默认',
     }
 
     active = {}
@@ -96,13 +95,14 @@ def get_kanban_stats():
 def get_gpu():
     """GPU 显存占用率"""
     try:
+        # 标准 nvidia-smi 路径
         r = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.used,memory.total",
              "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=5,
         )
         if r.returncode != 0:
-            # WSL path
+            # WSL 路径
             r = subprocess.run(
                 ["/usr/lib/wsl/lib/nvidia-smi", "--query-gpu=memory.used,memory.total",
                  "--format=csv,noheader,nounits"],
@@ -141,8 +141,6 @@ def get_model():
         'deepseek-v3-': 'DS-V3-',
         'claude-sonnet-4': 'CS4',
         'claude-': 'Claude-',
-        'minimax-m2.7': 'MM-M2.7',
-        'minimax-m3': 'MM-M3',
         'gpt-4o': 'GPT4o',
         'gpt-5.4': 'GPT5.4',
     }
