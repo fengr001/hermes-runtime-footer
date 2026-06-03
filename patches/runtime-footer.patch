@@ -1,0 +1,67 @@
+diff --git a/gateway/run.py b/gateway/run.py
+index a104e4b81..09b019ab4 100644
+--- a/gateway/run.py
++++ b/gateway/run.py
+@@ -9210,6 +9210,7 @@ class GatewayRunner:
+                     context_tokens=agent_result.get("last_prompt_tokens", 0) or 0,
+                     context_length=agent_result.get("context_length") or None,
+                     cwd=os.environ.get("TERMINAL_CWD", ""),
++                    session_start=session_entry.created_at.isoformat() if session_entry and session_entry.created_at else None,
+                 )
+             except Exception as _footer_err:
+                 logger.debug("runtime_footer build failed: %s", _footer_err)
+diff --git a/gateway/runtime_footer.py b/gateway/runtime_footer.py
+index 024cf74d6..9978d04b0 100644
+--- a/gateway/runtime_footer.py
++++ b/gateway/runtime_footer.py
+@@ -26,6 +26,7 @@ piecemeal, the footer is sent as a separate trailing message via
+ from __future__ import annotations
+ 
+ import os
++import subprocess
+ from typing import Any, Iterable, Optional
+ 
+ _DEFAULT_FIELDS: tuple[str, ...] = ("model", "context_pct", "cwd")
+@@ -130,20 +131,32 @@ def build_footer_line(
+     context_tokens: int,
+     context_length: Optional[int],
+     cwd: Optional[str] = None,
++    session_start: Optional[str] = None,
+ ) -> str:
+     """Top-level entry point used by gateway/run.py.
+ 
+-    Returns the footer text (empty string when disabled or no data).  Callers
+-    append this to the final response themselves, preserving a single blank
+-    line of separation.
++    Calls session_stats.py for a compact session-status footer.
++    Callers append this to the final response themselves.
+     """
+     cfg = resolve_footer_config(user_config, platform_key)
+     if not cfg.get("enabled"):
+         return ""
+-    return format_runtime_footer(
+-        model=model,
+-        context_tokens=context_tokens,
+-        context_length=context_length,
+-        cwd=cwd,
+-        fields=cfg.get("fields") or _DEFAULT_FIELDS,
+-    )
++
++    # 上下文用量百分比
++    ctx_pct = ""
++    if context_length and context_length > 0 and context_tokens >= 0:
++        pct = max(0, min(100, round((context_tokens / context_length) * 100)))
++        ctx_pct = f" {pct}%"
++
++    try:
++        cmd = ["python3", os.path.expanduser("~/.hermes/scripts/session_stats.py")]
++        if session_start:
++            cmd.extend(["--start", session_start])
++        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
++        footer = r.stdout.strip()
++        if footer:
++            return footer + ctx_pct
++    except Exception:
++        pass
++
++    return ctx_pct.strip(" | ")
